@@ -3,27 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Magic Christmas - Final Animation Fix</title>
+    <title>Magic Christmas - Fixed</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 
     <style>
-        body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; touch-action: none; }
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; }
         #canvas-container { width: 100%; height: 100vh; display: block; }
-        #ui-layer { position: absolute; bottom: 8%; width: 100%; text-align: center; z-index: 100; pointer-events: none; }
-        .guide { color: white; background: rgba(0,0,0,0.8); padding: 10px 20px; border-radius: 20px; display: inline-block; font-size: 14px; border: 1px solid gold; box-shadow: 0 0 10px rgba(255,215,0,0.2); }
-        button { pointer-events: auto; cursor: pointer; background: linear-gradient(#D32F2F, #8B0000); color: white; border: 2px solid #FFD700; padding: 15px 40px; border-radius: 30px; font-weight: bold; font-size: 18px; box-shadow: 0 0 20px rgba(255,0,0,0.5); animation: pulse 1.5s infinite; }
-        @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
-        #camera-preview { position: absolute; top: 10px; left: 10px; width: 110px; height: 82px; border: 1px solid #FFD700; transform: scaleX(-1); border-radius: 8px; z-index: 50; opacity: 0.8; }
-        #status-info { position: absolute; top: 100px; left: 10px; color: gold; font-size: 12px; z-index: 50; background: rgba(0,0,0,0.5); padding: 4px 8px; border-radius: 4px; }
+        #ui-layer { position: absolute; bottom: 30px; width: 100%; text-align: center; z-index: 100; pointer-events: none; }
+        .guide { color: white; background: rgba(0,0,0,0.6); padding: 10px 20px; border-radius: 20px; display: inline-block; margin-bottom: 15px; }
+        button { pointer-events: auto; cursor: pointer; background: #D32F2F; color: white; border: 2px solid #FFD700; padding: 15px 40px; border-radius: 30px; font-weight: bold; font-size: 18px; box-shadow: 0 0 20px rgba(255,0,0,0.5); }
+        #camera-preview { position: absolute; top: 15px; right: 15px; width: 140px; height: 105px; border: 2px solid #FFD700; transform: scaleX(-1); border-radius: 10px; z-index: 50; }
     </style>
 </head>
 <body>
-    <div id="status-info">Đang chờ camera...</div>
     <div id="ui-layer">
-        <div class="guide">🖐 <b>Xòe tay:</b> Vòng quay ảnh | ✊ <b>Nắm tay:</b> Cây thông | 👌 <b>Chụm:</b> Phóng to</div><br><br>
+        <div class="guide">🖐 Xòe tay: Pháo hoa | ✊ Nắm tay: Cây thông | 👌 Chụm ngón: Xem ảnh</div><br>
         <button id="btnStart">BẮT ĐẦU PHÉP THUẬT</button>
     </div>
 
@@ -32,53 +29,37 @@
     <canvas id="camera-preview"></canvas>
 
     <script>
-        let scene, camera, renderer, groupGold, photoMeshes = [];
-        let state = 'TREE', handX = 0.5, selectedIndex = 0;
-        let autoRotation = 0; // Biến tích lũy góc xoay
+        // Khởi tạo các biến toàn cục ngay từ đầu
+        let scene, camera, renderer, groupGold;
+        let photoMeshes = [], state = 'TREE', handX = 0.5, selectedIndex = 0;
         const bgMusic = new Audio("./audio.mp3");
         bgMusic.loop = true;
 
-        // Tạo texture hạt lấp lánh
-        function createPointTexture() {
-            const canvas = document.createElement('canvas');
-            canvas.width = 64; canvas.height = 64;
-            const ctx = canvas.getContext('2d');
-            const grd = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
-            grd.addColorStop(0, 'rgba(255,255,255,1)');
-            grd.addColorStop(0.3, 'rgba(255,215,0,0.8)');
-            grd.addColorStop(1, 'rgba(0,0,0,0)');
-            ctx.fillStyle = grd; ctx.fillRect(0,0,64,64);
-            return new THREE.CanvasTexture(canvas);
-        }
-
+        // 1. Hàm khởi tạo 3D
         function init3D() {
             scene = new THREE.Scene();
-            scene.fog = new THREE.FogExp2(0x000000, 0.0015);
             camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1000);
-            camera.position.z = 110;
+            camera.position.z = 100;
 
-            renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
+            renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); 
             document.getElementById('canvas-container').appendChild(renderer.domElement);
 
-            const count = 2000;
+            // Tạo hạt vàng
+            const count = 2500;
+            const pos = new Float32Array(count * 3);
             const treeTargets = new Float32Array(count * 3);
             const explodeTargets = new Float32Array(count * 3);
-            const pos = new Float32Array(count * 3);
-            const sizes = new Float32Array(count);
 
             for(let i=0; i<count; i++) {
-                // Cây thông
-                const h = Math.random() * 75;
-                const r = (1 - h/75) * 38 * Math.sqrt(Math.random());
+                const h = Math.random() * 70;
+                const r = (1 - h/70) * 35 * Math.sqrt(Math.random());
                 const theta = Math.random() * Math.PI * 2;
                 treeTargets[i*3] = r * Math.cos(theta);
                 treeTargets[i*3+1] = h - 35;
                 treeTargets[i*3+2] = r * Math.sin(theta);
 
-                // Vòng quay (Explode)
-                const rad = 65 * Math.cbrt(Math.random());
+                const rad = 60 * Math.cbrt(Math.random());
                 const phi = Math.acos(2 * Math.random() - 1);
                 const lam = 2 * Math.PI * Math.random();
                 explodeTargets[i*3] = rad * Math.sin(phi) * Math.cos(lam);
@@ -86,43 +67,20 @@
                 explodeTargets[i*3+2] = rad * Math.cos(phi);
 
                 pos[i*3] = treeTargets[i*3]; pos[i*3+1] = treeTargets[i*3+1]; pos[i*3+2] = treeTargets[i*3+2];
-                sizes[i] = Math.random() * 2 + 1;
             }
 
             const geo = new THREE.BufferGeometry();
             geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-            geo.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
-            
-            groupGold = new THREE.Points(geo, new THREE.PointsMaterial({ 
-                size: 1.5, 
-                map: createPointTexture(), 
-                transparent: true, 
-                blending: THREE.AdditiveBlending,
-                depthWrite: false,
-                color: 0xFFD700 
-            }));
+            groupGold = new THREE.Points(geo, new THREE.PointsMaterial({ size: 1, color: 0xFFD700 }));
             groupGold.userData = { tree: treeTargets, explode: explodeTargets };
             scene.add(groupGold);
 
+            // Tải ảnh
             const loader = new THREE.TextureLoader();
             for(let i=1; i<=5; i++) {
                 const tex = loader.load(`./image${i}.jpeg`);
-                const group = new THREE.Group(); // Dùng group để xoay ảnh dễ hơn
-                const mesh = new THREE.Mesh(
-                    new THREE.PlaneGeometry(14, 14), 
-                    new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide, transparent: true })
-                );
-                // Thêm viền vàng cho ảnh
-                const border = new THREE.Mesh(
-                    new THREE.PlaneGeometry(14.5, 14.5),
-                    new THREE.MeshBasicMaterial({ color: 0xFFD700, side: THREE.DoubleSide })
-                );
-                border.position.z = -0.1;
-                group.add(border);
-                group.add(mesh);
-                group.visible = false;
-                scene.add(group);
-                photoMeshes.push(group);
+                const mesh = new THREE.Mesh(new THREE.PlaneGeometry(10, 10), new THREE.MeshBasicMaterial({ map: tex, side: THREE.DoubleSide }));
+                mesh.visible = false; scene.add(mesh); photoMeshes.push(mesh);
             }
             animate();
         }
@@ -133,61 +91,32 @@
             const positions = groupGold.geometry.attributes.position.array;
             const targets = (state === 'TREE') ? groupGold.userData.tree : groupGold.userData.explode;
 
-            // Di chuyển hạt mượt mà
-            for(let i=0; i<positions.length; i++) {
-                positions[i] += (targets[i] - positions[i]) * 0.1;
-            }
+            for(let i=0; i<positions.length; i++) positions[i] += (targets[i] - positions[i]) * 0.1;
             groupGold.geometry.attributes.position.needsUpdate = true;
-
-            // Logic xoay ảnh tự động + bám theo tay
-            // Nếu xòe tay, tốc độ xoay sẽ ảnh hưởng bởi handX
-            let rotationSpeed = 0.005; // Tốc độ mặc định
-            if (state === 'EXPLODE') {
-                rotationSpeed = (handX - 0.5) * 0.15; // Tay càng xa tâm xoay càng nhanh
-            }
-            autoRotation += rotationSpeed;
 
             if (state === 'TREE') {
                 groupGold.rotation.y += 0.01;
-                photoMeshes.forEach(m => { 
-                    m.visible = false; 
-                    m.scale.lerp(new THREE.Vector3(0,0,0), 0.1); 
-                });
+                photoMeshes.forEach(m => m.visible = false);
             } else if (state === 'EXPLODE') {
-                groupGold.rotation.y = autoRotation; // Hạt xoay theo
                 photoMeshes.forEach((m, i) => {
                     m.visible = true;
-                    const angle = autoRotation + i * (Math.PI * 2 / 5);
-                    const radius = 40;
-                    
-                    // Hiệu ứng animation bồng bềnh (bobbing)
-                    const yPos = Math.sin(time + i) * 4;
-                    
-                    m.position.set(Math.sin(angle) * radius, yPos, Math.cos(angle) * radius);
-                    m.lookAt(0, 0, 0); // Luôn nhìn vào tâm vòng xoay
-                    
-                    // Zoom nhẹ ảnh ở gần camera
-                    const scaleVal = (m.position.z > 20) ? 1.8 : 1.2;
-                    m.scale.lerp(new THREE.Vector3(scaleVal, scaleVal, scaleVal), 0.1);
-                    
-                    if(m.position.z > 30) selectedIndex = i;
+                    const angle = groupGold.rotation.y + i * (Math.PI*2/5);
+                    m.position.set(Math.sin(angle)*30, Math.sin(time+i)*5, Math.cos(angle)*30);
+                    m.lookAt(camera.position); m.scale.set(1.5, 1.5, 1.5);
+                    if(m.position.z > 20) selectedIndex = i;
                 });
             } else if (state === 'PHOTO') {
                 photoMeshes.forEach((m, i) => {
                     if(i === selectedIndex) {
-                        m.visible = true;
-                        m.position.lerp(new THREE.Vector3(0, 0, 65), 0.1);
-                        m.scale.lerp(new THREE.Vector3(5, 5, 5), 0.1);
-                        m.rotation.y = Math.sin(time) * 0.2; // Lắc lư nhẹ khi phóng to
-                    } else {
-                        m.scale.lerp(new THREE.Vector3(0,0,0), 0.1);
-                        setTimeout(() => { if(state === 'PHOTO' && i !== selectedIndex) m.visible = false; }, 200);
-                    }
+                        m.visible = true; m.position.lerp(new THREE.Vector3(0,0,60), 0.1);
+                        m.scale.lerp(new THREE.Vector3(5,5,5), 0.1); m.lookAt(camera.position);
+                    } else m.visible = false;
                 });
             }
             renderer.render(scene, camera);
         }
 
+        // 2. Hàm xử lý hệ thống - ĐÃ ĐỊNH NGHĨA Ở ĐÂY
         async function runMagic() {
             document.getElementById('btnStart').style.display = 'none';
             bgMusic.play().catch(() => {});
@@ -195,8 +124,7 @@
 
             const video = document.querySelector('.input_video');
             const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
-            
-            hands.setOptions({ maxNumHands: 1, modelComplexity: 0, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
+            hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
 
             hands.onResults(results => {
                 const cv = document.getElementById('camera-preview');
@@ -204,40 +132,36 @@
                 ctx.clearRect(0,0,cv.width,cv.height);
                 if(results.image) ctx.drawImage(results.image, 0, 0, cv.width, cv.height);
 
-                const statusEl = document.getElementById('status-info');
-
                 if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
                     const lm = results.multiHandLandmarks[0];
-                    // handX mượt hơn
-                    handX = handX * 0.8 + lm[9].x * 0.2; 
-
+                    handX = lm[9].x;
                     const isFingerOpen = (tip, pip) => lm[tip].y < lm[pip].y;
                     const openCount = [isFingerOpen(8,6), isFingerOpen(12,10), isFingerOpen(16,14), isFingerOpen(20,18)].filter(Boolean).length;
                     const pinch = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y);
 
-                    if (pinch < 0.05) {
-                        state = 'PHOTO'; statusEl.innerText = "Trạng thái: 👌 Xem ảnh";
-                    } else if (openCount <= 1) {
-                        state = 'TREE'; statusEl.innerText = "Trạng thái: ✊ Cây thông";
-                    } else {
-                        state = 'EXPLODE'; statusEl.innerText = "Trạng thái: 🖐 Vòng xoay ảnh";
-                    }
-                } else {
-                    state = 'TREE'; statusEl.innerText = "Trạng thái: Đang tìm tay...";
+                    if (pinch < 0.06) state = 'PHOTO';
+                    else if (openCount <= 1) state = 'TREE';
+                    else state = 'EXPLODE';
                 }
             });
 
             const cam = new Camera(video, {
                 onFrame: async () => { await hands.send({image: video}); },
-                width: 480, height: 360
+                width: 640, height: 480
             });
             cam.start();
         }
 
-        document.getElementById('btnStart').addEventListener('click', runMagic);
+        // Đợi DOM tải xong mới gán sự kiện cho nút
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('btnStart').addEventListener('click', runMagic);
+        });
+
         window.addEventListener('resize', () => {
-            camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix();
-            renderer.setSize(window.innerWidth, window.innerHeight);
+            if(camera && renderer) {
+                camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            }
         });
     </script>
 </body>
