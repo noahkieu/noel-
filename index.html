@@ -3,25 +3,25 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Magic Christmas - Permanent Tree</title>
+    <title>Magic Christmas - Classic Warm Tree</title>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
 
     <style>
-        body { margin: 0; overflow: hidden; background-color: #000; font-family: sans-serif; }
+        body { margin: 0; overflow: hidden; background-color: #000; font-family: 'Times New Roman', serif; }
         #canvas-container { width: 100%; height: 100vh; display: block; }
-        #ui-layer { position: absolute; bottom: 8%; width: 100%; text-align: center; z-index: 100; pointer-events: none; }
-        .guide { color: white; background: rgba(0,0,0,0.7); padding: 12px 25px; border-radius: 30px; display: inline-block; font-size: 14px; border: 1px solid gold; backdrop-filter: blur(5px); }
-        button { pointer-events: auto; cursor: pointer; background: #D32F2F; color: white; border: 2px solid #FFD700; padding: 15px 45px; border-radius: 40px; font-weight: bold; font-size: 18px; box-shadow: 0 0 20px rgba(255,0,0,0.5); }
-        #camera-preview { position: absolute; top: 15px; left: 15px; width: 110px; height: 82px; border: 2px solid #FFD700; transform: scaleX(-1); border-radius: 12px; z-index: 50; background: #111; }
+        #ui-layer { position: absolute; bottom: 5%; width: 100%; text-align: center; z-index: 100; pointer-events: none; }
+        .guide { color: #FFD700; background: rgba(0,0,0,0.7); padding: 10px 25px; border-radius: 30px; display: inline-block; font-size: 16px; border: 2px solid #FFD700; font-style: italic; letter-spacing: 1px; }
+        button { pointer-events: auto; cursor: pointer; background: linear-gradient(to bottom, #b30000, #660000); color: #FFD700; border: 2px solid #FFD700; padding: 15px 50px; border-radius: 40px; font-weight: bold; font-size: 20px; box-shadow: 0 0 25px rgba(255,215,0,0.6); text-shadow: 1px 1px 2px black; font-family: 'Times New Roman', serif; }
+        #camera-preview { position: absolute; top: 15px; left: 15px; width: 120px; height: 90px; border: 3px solid #FFD700; transform: scaleX(-1); border-radius: 12px; z-index: 50; background: #111; box-shadow: 0 0 15px rgba(255,215,0,0.5); }
     </style>
 </head>
 <body>
     <div id="ui-layer">
-        <div class="guide">🖐 <b>Xòe tay:</b> Xem ảnh | ✊ <b>Nắm tay:</b> Cây thông đa sắc</div><br><br>
-        <button id="btnStart" onclick="startMagic()">BẮT ĐẦU PHÉP THUẬT</button>
+        <div class="guide">🖐 <b>Xòe tay:</b> Pháo hoa vàng | ✊ <b>Nắm tay:</b> Cây thông cổ điển</div><br><br>
+        <button id="btnStart" onclick="startMagic()">BẮT ĐẦU GIÁNG SINH</button>
     </div>
 
     <div id="canvas-container"></div>
@@ -29,55 +29,103 @@
     <canvas id="camera-preview"></canvas>
 
     <script>
-        // --- 1. TẠO TEXTURE TRÒN MỊN ---
-        function createSmoothTexture() {
+        // --- 1. TẠO TEXTURE HẠT SÁNG ẤM ---
+        function createWarmTexture() {
             const canvas = document.createElement('canvas');
-            canvas.width = 128; canvas.height = 128;
+            canvas.width = 64; canvas.height = 64;
             const ctx = canvas.getContext('2d');
-            const grd = ctx.createRadialGradient(64, 64, 0, 64, 64, 60);
-            grd.addColorStop(0, 'white');
-            grd.addColorStop(0.2, 'rgba(255, 255, 255, 0.6)');
-            grd.addColorStop(0.5, 'rgba(255, 255, 255, 0.1)');
+            const grd = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+            grd.addColorStop(0, 'rgba(255, 255, 224, 1)');   // Tâm vàng nhạt
+            grd.addColorStop(0.3, 'rgba(255, 215, 0, 0.8)');  // Vàng gold
+            grd.addColorStop(0.6, 'rgba(255, 140, 0, 0.3)');  // Cam đỏ nhạt
             grd.addColorStop(1, 'transparent');
-            ctx.fillStyle = grd; ctx.fillRect(0, 0, 128, 128);
+            ctx.fillStyle = grd; ctx.fillRect(0, 0, 64, 64);
             return new THREE.CanvasTexture(canvas);
         }
 
         // --- 2. BIẾN TOÀN CỤC ---
         let scene, camera, renderer, particleSystem, photoMeshes = [];
+        let titleMesh, starMesh;
         let state = 'TREE', handX = 0.5, currentRotation = 0, selectedIndex = 0;
         const bgMusic = new Audio("./audio.mp3");
         bgMusic.loop = true;
 
-        // --- 3. KHỞI TẠO 3D (CHẠY NGAY) ---
+        // --- 3. CÁC HÀM TẠO ĐỐI TƯỢNG PHỤ ---
+        function createTitle() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 1024; canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+            ctx.font = 'bold italic 100px "Times New Roman", serif';
+            ctx.fillStyle = '#FFD700'; ctx.textAlign = 'center';
+            ctx.shadowColor = "#FF4500"; ctx.shadowBlur = 30; ctx.shadowOffsetX = 5; ctx.shadowOffsetY = 5;
+            ctx.fillText("MERRY CHRISTMAS", 512, 150);
+            const tex = new THREE.CanvasTexture(canvas);
+            const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, blending: THREE.AdditiveBlending });
+            titleMesh = new THREE.Mesh(new THREE.PlaneGeometry(70, 17.5), mat);
+            titleMesh.position.set(0, 65, 0);
+            scene.add(titleMesh);
+        }
+
+        function createStar() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 128; canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = "#FFD700"; ctx.shadowColor="#FFFFE0"; ctx.shadowBlur=30;
+            ctx.beginPath();
+            const cx=64, cy=64, outer=50, inner=20;
+            for(let i=0; i<5; i++){
+                ctx.lineTo(cx + Math.cos((18+i*72)/180*Math.PI)*outer, cy - Math.sin((18+i*72)/180*Math.PI)*outer);
+                ctx.lineTo(cx + Math.cos((54+i*72)/180*Math.PI)*inner, cy - Math.sin((54+i*72)/180*Math.PI)*inner);
+            }
+            ctx.closePath(); ctx.fill();
+            const tex = new THREE.CanvasTexture(canvas);
+            const mat = new THREE.MeshBasicMaterial({ map: tex, transparent: true, blending: THREE.AdditiveBlending });
+            starMesh = new THREE.Mesh(new THREE.PlaneGeometry(15, 15), mat);
+            starMesh.position.set(0, 42, 0);
+            scene.add(starMesh);
+        }
+
+        // --- 4. KHỞI TẠO 3D CHÍNH ---
         function init3D() {
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 1, 1000);
-            camera.position.set(0, 10, 125);
+            camera.position.set(0, 20, 130);
 
-            renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+            renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
-            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setClearColor(0x000000, 1);
             document.getElementById('canvas-container').appendChild(renderer.domElement);
 
-            const count = 3000;
+            createTitle();
+            createStar();
+
+            const count = 4000; // Tăng số lượng hạt
             const treeTargets = new Float32Array(count * 3);
             const explodeTargets = new Float32Array(count * 3);
             const pos = new Float32Array(count * 3);
             const colors = new Float32Array(count * 3);
-            const palette = [0xFFD700, 0xFF3333, 0x33FF77, 0x66CCFF]; 
+            const sizes = new Float32Array(count);
+            
+            // Bảng màu ấm áp cổ điển
+            const palette = [
+                0xFFD700, // Vàng Gold
+                0xFF4500, // Cam Đỏ
+                0xFF8C00, // Cam Đậm
+                0xB22222, // Đỏ Gạch
+                0xFFFFE0  // Vàng Kem sáng
+            ];
 
             for(let i=0; i<count; i++) {
-                // Cây thông xoắn ốc (nhìn sẽ mượt hơn dạng nón thẳng)
-                const h = Math.random() * 85;
-                const r = (1 - h/85) * 45 * Math.sqrt(Math.random());
-                const angle = (h / 85) * Math.PI * 12 + Math.random();
+                // Hình dáng cây thông nón cổ điển
+                const h = Math.random() * 90;
+                const r = (1 - h/90) * 45; // Bán kính giảm dần đều theo chiều cao
+                const angle = Math.random() * Math.PI * 2;
                 treeTargets[i*3] = r * Math.cos(angle);
-                treeTargets[i*3+1] = h - 40;
+                treeTargets[i*3+1] = h - 45;
                 treeTargets[i*3+2] = r * Math.sin(angle);
 
-                // Vòng quay ảnh
-                const rad = 70 * Math.cbrt(Math.random());
+                // Hình dáng vòng quay pháo hoa
+                const rad = 75 * Math.cbrt(Math.random());
                 const phi = Math.acos(2 * Math.random() - 1);
                 const lam = 2 * Math.PI * Math.random();
                 explodeTargets[i*3] = rad * Math.sin(phi) * Math.cos(lam);
@@ -86,16 +134,20 @@
 
                 pos[i*3] = treeTargets[i*3]; pos[i*3+1] = treeTargets[i*3+1]; pos[i*3+2] = treeTargets[i*3+2];
 
-                const c = new THREE.Color(palette[Math.floor(Math.random() * 4)]);
+                const c = new THREE.Color(palette[Math.floor(Math.random() * palette.length)]);
                 colors[i*3] = c.r; colors[i*3+1] = c.g; colors[i*3+2] = c.b;
+                
+                // Kích thước hạt đa dạng
+                sizes[i] = Math.random() * 3.5 + 1.5;
             }
 
             const geo = new THREE.BufferGeometry();
             geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
             geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+            geo.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
 
             particleSystem = new THREE.Points(geo, new THREE.PointsMaterial({
-                size: 2.5, map: createSmoothTexture(), vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true
+                map: createWarmTexture(), vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, sizeAttenuation: true
             }));
             particleSystem.userData = { tree: treeTargets, explode: explodeTargets, origColors: colors };
             scene.add(particleSystem);
@@ -113,50 +165,52 @@
             requestAnimationFrame(animate);
             const time = Date.now() * 0.001;
             const positions = particleSystem.geometry.attributes.position.array;
-            
-            // Đảm bảo targets luôn có dữ liệu, tránh hạt bị biến mất
             const targets = (state === 'EXPLODE' || state === 'PHOTO') ? particleSystem.userData.explode : particleSystem.userData.tree;
 
             for(let i=0; i<positions.length; i++) {
-                positions[i] += (targets[i] - positions[i]) * 0.1;
+                positions[i] += (targets[i] - positions[i]) * 0.08;
             }
             particleSystem.geometry.attributes.position.needsUpdate = true;
 
-            // Nhấp nháy đèn LED
+            // Hiệu ứng nhấp nháy ấm áp nhẹ nhàng
             const colorArr = particleSystem.geometry.attributes.color.array;
             const orig = particleSystem.userData.origColors;
             for(let i=0; i<colorArr.length/3; i++) {
-                const tw = 0.7 + 0.3 * Math.sin(time * 4 + i);
+                const tw = 0.7 + 0.3 * Math.sin(time * 3 + i * 0.5);
                 colorArr[i*3] = orig[i*3] * tw; colorArr[i*3+1] = orig[i*3+1] * tw; colorArr[i*3+2] = orig[i*3+2] * tw;
             }
             particleSystem.geometry.attributes.color.needsUpdate = true;
 
             if (state === 'TREE') {
-                particleSystem.rotation.y += 0.012;
+                particleSystem.rotation.y += 0.005;
+                titleMesh.visible = true; titleMesh.scale.lerp(new THREE.Vector3(1,1,1), 0.1);
+                starMesh.visible = true; starMesh.rotation.y += 0.02;
                 photoMeshes.forEach(m => { m.visible = false; m.scale.set(0,0,0); });
             } else if (state === 'EXPLODE') {
+                titleMesh.visible = false; starMesh.visible = false;
                 let rotSpeed = (handX - 0.5) * 0.15;
                 currentRotation += rotSpeed;
                 particleSystem.rotation.y = currentRotation;
                 photoMeshes.forEach((m, i) => {
                     m.visible = true;
                     const ang = currentRotation + i * (Math.PI*2/5);
-                    m.position.set(Math.sin(ang)*40, Math.sin(time+i)*4, Math.cos(ang)*40);
+                    m.position.set(Math.sin(ang)*45, Math.sin(time+i)*5, Math.cos(ang)*45);
                     m.lookAt(camera.position); m.scale.lerp(new THREE.Vector3(1.6, 1.6, 1.6), 0.1);
                     if(m.position.z > 25) selectedIndex = i;
                 });
             } else if (state === 'PHOTO') {
+                titleMesh.visible = false; starMesh.visible = false;
                 photoMeshes.forEach((m, i) => {
                     if(i === selectedIndex) {
-                        m.visible = true; m.position.lerp(new THREE.Vector3(0,5,75), 0.1);
-                        m.scale.lerp(new THREE.Vector3(4.5, 4.5, 4.5), 0.1); m.lookAt(camera.position);
+                        m.visible = true; m.position.lerp(new THREE.Vector3(0,5,80), 0.1);
+                        m.scale.lerp(new THREE.Vector3(5, 5, 5), 0.1); m.lookAt(camera.position);
                     } else m.visible = false;
                 });
             }
             renderer.render(scene, camera);
         }
 
-        // --- 4. KHỞI CHẠY AI ---
+        // --- 5. KHỞI CHẠY AI ---
         async function startMagic() {
             document.getElementById('btnStart').style.display = 'none';
             bgMusic.play().catch(() => {});
@@ -182,7 +236,6 @@
                     else if (openCount <= 1) state = 'TREE';
                     else state = 'EXPLODE';
                 } else {
-                    // Nếu không thấy tay, LUÔN LUÔN giữ ở trạng thái TREE
                     if (state !== 'PHOTO') state = 'TREE';
                 }
             });
@@ -194,7 +247,6 @@
             cam.start();
         }
 
-        // Chạy khởi tạo ngay lập tức
         document.addEventListener('DOMContentLoaded', init3D);
 
         window.addEventListener('resize', () => {
